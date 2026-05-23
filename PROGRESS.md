@@ -20,3 +20,10 @@
 - [x] Build Project create form (Hook Form + Zod + Select)
 - [x] Used base-ui patterns: `render` (not `asChild`), `items` prop for Select
 - [x] Fixed Zod 4 `coerce`/`preprocess` typing issues
+
+## Phase 5: Tasks & Kanban
+- [x] Build TaskStatusBadge + TaskPriorityBadge components
+- [x] Build Tasks table page with sort/search
+- [x] Build Kanban board with `@dnd-kit` drag-drop
+- [x] Build Task detail page (subtasks, comments, attachments)
+- [x] Build Task edit form page
