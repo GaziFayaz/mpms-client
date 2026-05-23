@@ -10,4 +10,8 @@
 - [x] Setup Zustand auth store
 - [x] Build `/login` UI + Hook Form + Zod
 - [x] Implement client auth guards (root redirect)
-- [ ] Update PROGRESS.md
+
+## Phase 3: Admin Shell
+- [x] Build layout UI (Sidebar, Header, Mobile Nav via Sheet)
+- [x] Build `/dashboard` overview cards
+- [x] Update PROGRESS.md
