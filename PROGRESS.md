@@ -14,4 +14,9 @@
 ## Phase 3: Admin Shell
 - [x] Build layout UI (Sidebar, Header, Mobile Nav via Sheet)
 - [x] Build `/dashboard` overview cards
-- [x] Update PROGRESS.md
+
+## Phase 4: Projects Module
+- [x] Build Projects grid/table view with Tabs toggle
+- [x] Build Project create form (Hook Form + Zod + Select)
+- [x] Used base-ui patterns: `render` (not `asChild`), `items` prop for Select
+- [x] Fixed Zod 4 `coerce`/`preprocess` typing issues
