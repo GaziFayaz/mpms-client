@@ -1,21 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export type UserRole = 'admin' | 'manager' | 'member';
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  department?: string;
-}
-
+import type { UserRole, AuthUser } from '@/types';
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  login: (user: User, token: string) => void;
+  login: (user: AuthUser, token: string, refreshToken: string) => void;
+  setTokens: (token: string, refreshToken: string) => void;
+  setUser: (user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -24,12 +17,15 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      login: (user, token, refreshToken) =>
+        set({ user, token, refreshToken, isAuthenticated: true }),
+      setTokens: (token, refreshToken) => set({ token, refreshToken }),
+      setUser: (user) => set({ user }),
+      logout: () =>
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
     }),
-    {
-      name: 'auth-storage',
-    }
+    { name: 'auth-storage' }
   )
 );

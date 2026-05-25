@@ -1,11 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { toast } from 'sonner';
 import Link from 'next/link';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldGroup, Field, FieldLabel, FieldError } from '@/components/ui/field';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useCreateMember } from '@/hooks/use-team';
 
 const memberSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -24,7 +23,7 @@ const memberSchema = z.object({
 
 export default function CreateTeamMemberPage() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const createMember = useCreateMember();
 
   const {
     register,
@@ -34,29 +33,20 @@ export default function CreateTeamMemberPage() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(memberSchema),
-    defaultValues: { role: 'Developer' },
+    defaultValues: { role: 'member' },
   });
 
   const roleValue = watch('role');
+
   const roleOptions = [
-    { label: 'Admin', value: 'Admin' },
-    { label: 'Manager', value: 'Manager' },
-    { label: 'Developer', value: 'Developer' },
-    { label: 'Designer', value: 'Designer' },
-    { label: 'QA', value: 'QA' },
+    { label: 'Admin', value: 'admin' },
+    { label: 'Manager', value: 'manager' },
+    { label: 'Member', value: 'member' },
   ];
 
-  const onSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      toast.success('Team member added successfully');
-      router.push('/dashboard/team');
-    } catch {
-      toast.error('Failed to add team member');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const onSubmit = async (data: Record<string, unknown>) => {
+    await createMember.mutateAsync(data);
+    router.push('/dashboard/team');
   };
 
   return (
@@ -89,12 +79,11 @@ export default function CreateTeamMemberPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        {roleOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        {roleOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
                 </Field>
-
                 <Field>
                   <FieldLabel htmlFor="department">Department</FieldLabel>
                   <Input id="department" placeholder="Engineering" {...register('department')} />
@@ -109,8 +98,8 @@ export default function CreateTeamMemberPage() {
 
               <div className="flex justify-end gap-4">
                 <Button render={<Link href="/dashboard/team" />} nativeButton={false} variant="outline">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Adding...' : 'Add Member'}
+                <Button type="submit" disabled={createMember.isPending}>
+                  {createMember.isPending ? 'Adding...' : 'Add Member'}
                 </Button>
               </div>
             </FieldGroup>

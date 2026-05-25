@@ -1,17 +1,27 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Folder, CheckSquare, Clock, Users } from 'lucide-react';
 import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useReportsOverview } from '@/hooks/use-reports';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Folder, CheckSquare, Clock, Users } from 'lucide-react';
 
 export default function DashboardOverview() {
-  // Mock data for now
+  const { data: projects, isLoading, error } = useReportsOverview();
+
+  const totalProjects = projects?.length ?? 0;
+  const activeProjects = projects?.filter(p => p.status === 'active').length ?? 0;
+  const totalTasks = projects?.reduce((sum, p) => sum + p.total_tasks, 0) ?? 0;
+  const avgProgress = projects?.length
+    ? Math.round(projects.reduce((sum, p) => sum + p.progress_percent, 0) / projects.length)
+    : 0;
+
   const stats = [
-    { title: 'Total Projects', value: '12', icon: Folder, desc: '+2 from last month' },
-    { title: 'Active Sprints', value: '4', icon: Clock, desc: 'Across 3 projects' },
-    { title: 'Tasks Pending', value: '45', icon: CheckSquare, desc: '12 high priority' },
-    { title: 'Team Members', value: '8', icon: Users, desc: '2 pending invites' },
+    { title: 'Total Projects', value: totalProjects, icon: Folder, desc: `${activeProjects} active` },
+    { title: 'Total Tasks', value: totalTasks, icon: CheckSquare, desc: 'Across all projects' },
+    { title: 'Avg Progress', value: `${avgProgress}%`, icon: Clock, desc: 'Overall completion' },
+    { title: 'Team Members', value: '-', icon: Users, desc: 'Via Team page' },
   ];
 
   return (
@@ -32,39 +42,39 @@ export default function DashboardOverview() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, i) => (
-          <Card key={i}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-muted-foreground">{stat.desc}</p>
-            </CardContent>
-          </Card>
-        ))}
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-12 mb-1" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))
+          : stats.map((stat, i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+                  <stat.icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-muted-foreground">{stat.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
       </div>
 
-      {/* Recent Activity Placeholder */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Activity feed will be implemented here.</p>
+      {error && (
+        <Card>
+          <CardContent className="p-4 text-sm text-destructive">
+            Failed to load dashboard data. Ensure backend is running.
           </CardContent>
         </Card>
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Upcoming Deadlines</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Deadlines list will be implemented here.</p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

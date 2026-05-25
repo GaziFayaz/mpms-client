@@ -39,3 +39,20 @@
 - [x] Build shared components (EmptyState, LoadingSpinner)
 - [x] Add constants (statuses, priorities, roles)
 - [x] Add `.env.example`
+
+## Phase 7: Backend Compatibility
+- [x] Types matching backend response shapes (types/index.ts)
+- [x] Constants aligned with backend enum values (snake_case)
+- [x] Display label mappings for all enums
+- [x] API response unwrapping in interceptor
+- [x] Token refresh interceptor with queue
+- [x] Auth store with refreshToken support
+- [x] React Query hooks for all 9 modules
+- [x] Updated all badge components with backend value mappings
+- [x] Replaced all mock data with real API hooks
+- [x] Added loading/error/empty states to all pages
+- [x] Kanban drag-drop → PATCH /api/tasks/:id/kanban-order
+- [x] Status transitions → PATCH /api/tasks/:id/status
+- [x] Subtask CRUD → POST/PATCH subtask endpoints
+- [x] Comments → POST /api/tasks/:id/comments
+- [x] All 19 routes building and type-safe

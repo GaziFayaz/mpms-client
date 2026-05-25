@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TaskStatusBadge } from '@/components/tasks/task-status-badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
+import { useTasks, useUpdateKanbanOrder } from '@/hooks/use-tasks';
+import { TASK_STATUS_DISPLAY } from '@/lib/constants';
 import { List } from 'lucide-react';
-import {
+import type { TaskListItem, TaskStatus } from '@/types';import {
   DndContext,
   DragEndEvent,
   DragOverlay,
@@ -25,41 +27,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-interface Task {
-  id: string;
-  title: string;
-  assignee: string;
-  priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  dueDate: string;
-  status: 'To Do' | 'In Progress' | 'Review' | 'Done';
-}
+const COLUMNS: TaskStatus[] = ['todo', 'in_progress', 'review', 'done'];
 
-const COLUMNS: { id: Task['status']; title: string }[] = [
-  { id: 'To Do', title: 'To Do' },
-  { id: 'In Progress', title: 'In Progress' },
-  { id: 'Review', title: 'Review' },
-  { id: 'Done', title: 'Done' },
-];
-
-const initialTasks: Task[] = [
-  { id: '1', title: 'Design landing page', assignee: 'Alice', priority: 'High', dueDate: 'Jun 15', status: 'In Progress' },
-  { id: '2', title: 'Set up CI/CD', assignee: 'Bob', priority: 'Medium', dueDate: 'Jun 20', status: 'To Do' },
-  { id: '3', title: 'Write API docs', assignee: 'Carol', priority: 'Low', dueDate: 'Jun 10', status: 'Done' },
-  { id: '4', title: 'Review PRs', assignee: 'Dave', priority: 'High', dueDate: 'Jun 12', status: 'Review' },
-  { id: '5', title: 'Fix payment bug', assignee: 'Eve', priority: 'Critical', dueDate: 'Jun 08', status: 'In Progress' },
-  { id: '6', title: 'Update dependencies', assignee: 'Alice', priority: 'Low', dueDate: 'Jun 25', status: 'To Do' },
-  { id: '7', title: 'Database backup', assignee: 'Bob', priority: 'Medium', dueDate: 'Jun 18', status: 'To Do' },
-];
-
-function KanbanCard({ task }: { task: Task }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id, data: { task } });
+function KanbanCard({ task }: { task: TaskListItem }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+    data: { task },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -68,13 +42,7 @@ function KanbanCard({ task }: { task: Task }) {
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="cursor-grab active:cursor-grabbing"
-    >
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
       <Card className="p-3 hover:shadow-md transition-shadow">
         <Link href={`/dashboard/tasks/${task.id}`} className="font-medium text-sm hover:underline block mb-2">
           {task.title}
@@ -82,9 +50,9 @@ function KanbanCard({ task }: { task: Task }) {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <TaskPriorityBadge priority={task.priority} />
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span>{task.assignee}</span>
+            <span>{task.assignees[0]?.name || '-'}</span>
             <span>·</span>
-            <span>{task.dueDate}</span>
+            <span>{task.projectTitle}</span>
           </div>
         </div>
       </Card>
@@ -92,16 +60,16 @@ function KanbanCard({ task }: { task: Task }) {
   );
 }
 
-function KanbanColumn({ column, tasks }: { column: { id: string; title: string }; tasks: Task[] }) {
+function KanbanColumn({ status, tasks }: { status: TaskStatus; tasks: TaskListItem[] }) {
   return (
     <div className="flex flex-col w-72 shrink-0">
       <div className="flex items-center justify-between mb-3 px-1">
-        <h3 className="font-semibold text-sm">{column.title}</h3>
+        <h3 className="font-semibold text-sm">{TASK_STATUS_DISPLAY[status]}</h3>
         <Badge variant="secondary" className="text-xs">{tasks.length}</Badge>
       </div>
-      <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
         <div className="flex flex-col gap-2">
-          {tasks.map(task => (
+          {tasks.map((task) => (
             <KanbanCard key={task.id} task={task} />
           ))}
           {tasks.length === 0 && (
@@ -116,47 +84,67 @@ function KanbanColumn({ column, tasks }: { column: { id: string; title: string }
 }
 
 export default function KanbanPage() {
-  const [tasks, setTasks] = useState(initialTasks);
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const { data: allTasks, isLoading } = useTasks();
+  const updateKanbanOrder = useUpdateKanbanOrder();
+  const [activeTask, setActiveTask] = useState<TaskListItem | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  function findColumn(status: Task['status']) {
-    return tasks.filter(t => t.status === status);
-  }
+  const columns = useMemo(() => {
+    return COLUMNS.map((status) => ({
+      status,
+      tasks: allTasks?.filter((t) => t.status === status) ?? [],
+    }));
+  }, [allTasks]);
 
-  function handleDragStart(event: DragStartEvent) {
-    const task = tasks.find(t => t.id === event.active.id);
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = allTasks?.find((t) => t.id === event.active.id);
     if (task) setActiveTask(task);
-  }
+  };
 
-  function handleDragEnd(event: DragEndEvent) {
+  const handleDragEnd = (event: DragEndEvent) => {
     setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
-
     if (activeId === overId) return;
 
-    const activeTask = tasks.find(t => t.id === activeId);
+    const activeTask = allTasks?.find((t) => t.id === activeId);
     if (!activeTask) return;
 
-    // Check if dropped on a column (no matching task id = column area)
-    const overTask = tasks.find(t => t.id === overId);
-    if (overTask) {
-      // Dropped on another task - move to same status
-      setTasks(prev => prev.map(t => t.id === activeId ? { ...t, status: overTask.status } : t));
+    // Determine target column
+    let targetStatus: TaskStatus | null = null;
+    const overInColumn = COLUMNS.find((col) => col === overId) as TaskStatus | undefined;
+    if (overInColumn) {
+      targetStatus = overInColumn;
     } else {
-      // Dropped on a column container - check if overId is a column id
-      const columnIds = COLUMNS.map(c => c.id);
-      if (columnIds.includes(overId as Task['status'])) {
-        setTasks(prev => prev.map(t => t.id === activeId ? { ...t, status: overId as Task['status'] } : t));
-      }
+      const overTask = allTasks?.find((t) => t.id === overId);
+      if (overTask) targetStatus = overTask.status;
     }
+
+    if (!targetStatus) return;
+
+    // Optimistic update via mutation
+    updateKanbanOrder.mutate({
+      id: activeId,
+      status: targetStatus,
+      sortOrder: 0,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-10 w-48" />
+        <div className="flex gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="w-72"><Skeleton className="h-64 w-full" /></div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -167,20 +155,14 @@ export default function KanbanPage() {
           <p className="text-muted-foreground">Drag and drop tasks to update their status.</p>
         </div>
         <Button render={<Link href="/dashboard/tasks" />} nativeButton={false} variant="outline">
-          <List className="mr-2 h-4 w-4" />
-          Table View
+          <List className="mr-2 h-4 w-4" />Table View
         </Button>
       </div>
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
-          {COLUMNS.map(col => (
-            <KanbanColumn key={col.id} column={col} tasks={findColumn(col.id)} />
+          {columns.map((col) => (
+            <KanbanColumn key={col.status} status={col.status} tasks={col.tasks} />
           ))}
         </div>
 
@@ -189,9 +171,7 @@ export default function KanbanPage() {
             <Card className="p-3 shadow-lg w-72">
               <p className="font-medium text-sm">{activeTask.title}</p>
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                <span>{activeTask.assignee}</span>
-                <span>·</span>
-                <span>{activeTask.dueDate}</span>
+                <span>{activeTask.assignees[0]?.name || '-'}</span>
               </div>
             </Card>
           )}

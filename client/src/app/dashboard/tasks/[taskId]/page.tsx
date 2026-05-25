@@ -5,74 +5,64 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { TaskStatusBadge } from '@/components/tasks/task-status-badge';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
-import { ArrowLeft, Plus, Check, X, Trash, MessageSquare, Paperclip, Clock, Edit } from 'lucide-react';
-
-const nextStatus: Record<string, string> = {
-  'To Do': 'In Progress',
-  'In Progress': 'Review',
-  'Review': 'Done',
-};
-
-interface Subtask {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
-interface Comment {
-  id: string;
-  author: string;
-  text: string;
-  date: string;
-}
-
-const mockSubtasks: Subtask[] = [
-  { id: 's1', title: 'Research competitor designs', completed: true },
-  { id: 's2', title: 'Create wireframes', completed: true },
-  { id: 's3', title: 'Design high-fidelity mockups', completed: false },
-  { id: 's4', title: 'Get stakeholder approval', completed: false },
-];
-
-const mockComments: Comment[] = [
-  { id: 'c1', author: 'Bob Lee', text: 'Looks good so far. Can we increase the contrast on the header?', date: 'Jun 14, 2026' },
-  { id: 'c2', author: 'Alice Chen', text: 'Sure, I will update that in the next iteration.', date: 'Jun 14, 2026' },
-];
+import { useTask, useAddSubtask, useToggleSubtask, useAddComment, useUpdateTaskStatus } from '@/hooks/use-tasks';
+import { TASK_STATUS_TRANSITIONS, TASK_STATUS_DISPLAY } from '@/lib/constants';
+import { ArrowLeft, Plus, Check, X, Clock, MessageSquare, Paperclip, Edit } from 'lucide-react';
 
 export default function TaskDetailPage() {
   const params = useParams<{ taskId: string }>();
-  const [subtasks, setSubtasks] = useState(mockSubtasks);
-  const [newSubtask, setNewSubtask] = useState('');
-  const [comments] = useState(mockComments);
-  const [newComment, setNewComment] = useState('');
-  const [status, setStatus] = useState('In Progress');
   const taskId = params.taskId;
+  const { data: task, isLoading } = useTask(taskId);
+  const addSubtask = useAddSubtask();
+  const toggleSubtask = useToggleSubtask();
+  const addComment = useAddComment();
+  const updateStatus = useUpdateTaskStatus();
 
-  const subtaskProgress = subtasks.length > 0 
-    ? Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100) 
+  const [newSubtask, setNewSubtask] = useState('');
+  const [newComment, setNewComment] = useState('');
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2"><Skeleton className="h-96 w-full" /></div>
+          <div><Skeleton className="h-48 w-full" /></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!task) {
+    return <div className="text-center py-12 text-muted-foreground">Task not found.</div>;
+  }
+
+  const subtaskProgress = task.subtasks.length > 0
+    ? Math.round((task.subtasks.filter((s) => s.completed).length / task.subtasks.length) * 100)
     : 0;
 
-  const toggleSubtask = (id: string) => {
-    setSubtasks(prev => prev.map(s => s.id === id ? { ...s, completed: !s.completed } : s));
-  };
+  const nextStatuses = TASK_STATUS_TRANSITIONS[task.status] || [];
 
-  const addSubtask = () => {
+  const handleAddSubtask = () => {
     if (!newSubtask.trim()) return;
-    setSubtasks(prev => [...prev, { id: `s${Date.now()}`, title: newSubtask.trim(), completed: false }]);
+    addSubtask.mutate({ taskId: task.id, title: newSubtask.trim() });
     setNewSubtask('');
   };
 
-  const removeSubtask = (id: string) => {
-    setSubtasks(prev => prev.filter(s => s.id !== id));
+  const handlePostComment = () => {
+    if (!newComment.trim()) return;
+    addComment.mutate({ taskId: task.id, body: newComment.trim() });
+    setNewComment('');
   };
 
-  const advanceStatus = () => {
-    setStatus(prev => nextStatus[prev] || prev);
+  const handleStatusChange = (status: typeof nextStatuses[number]) => {
+    updateStatus.mutate({ id: task.id, status });
   };
 
   return (
@@ -82,63 +72,50 @@ export default function TaskDetailPage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">Design Landing Page</h1>
-          <p className="text-muted-foreground">Task #{taskId} · In Website Redesign</p>
+          <h1 className="text-3xl font-bold tracking-tight">{task.title}</h1>
+          <p className="text-muted-foreground">Task {task.id.slice(0, 8)} · {task.projectTitle}</p>
         </div>
-        <Button render={<Link href={`/dashboard/tasks/${taskId}/edit`} />} nativeButton={false} variant="outline">
-          <Edit className="mr-2 h-4 w-4" />
-          Edit
+        <Button render={<Link href={`/dashboard/tasks/${task.id}/edit`} />} nativeButton={false} variant="outline">
+          <Edit className="mr-2 h-4 w-4" />Edit
         </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 flex flex-col gap-6">
-          {/* Description */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Description</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Description</CardTitle></CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Design a modern landing page for the Acme Corp website redesign. 
-                Must include hero section, features grid, testimonials carousel, and call-to-action.
-              </p>
+              <p className="text-sm text-muted-foreground">{task.description || 'No description.'}</p>
               <div className="flex flex-wrap gap-4 mt-4">
-                <div className="flex items-center gap-2">
-                  <TaskStatusBadge status={status as any} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <TaskPriorityBadge priority="High" />
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>Estimate: 8h</span>
-                </div>
+                <TaskStatusBadge status={task.status} />
+                <TaskPriorityBadge priority={task.priority} />
+                {task.estimateHours && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" /><span>Est: {task.estimateHours}h</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Subtasks */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">
                 Subtasks
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  {subtasks.filter(s => s.completed).length}/{subtasks.length}
+                  {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
                 </span>
               </CardTitle>
               <Progress value={subtaskProgress} className="w-24" />
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-2 mb-4">
-                {subtasks.map(subtask => (
+                {task.subtasks.map((subtask) => (
                   <div key={subtask.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
                     <button
-                      onClick={() => toggleSubtask(subtask.id)}
+                      onClick={() => toggleSubtask.mutate({ taskId: task.id, subtaskId: subtask.id, completed: !subtask.completed })}
                       className={`shrink-0 size-5 rounded border-2 flex items-center justify-center transition-colors ${
-                        subtask.completed 
-                          ? 'bg-primary border-primary text-primary-foreground' 
-                          : 'border-muted-foreground/30 hover:border-primary'
+                        subtask.completed ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/30 hover:border-primary'
                       }`}
                     >
                       {subtask.completed && <Check className="size-3" />}
@@ -146,102 +123,94 @@ export default function TaskDetailPage() {
                     <span className={`text-sm flex-1 ${subtask.completed ? 'line-through text-muted-foreground' : ''}`}>
                       {subtask.title}
                     </span>
-                    <button onClick={() => removeSubtask(subtask.id)} className="text-muted-foreground hover:text-destructive">
-                      <X className="size-4" />
-                    </button>
                   </div>
                 ))}
               </div>
               <div className="flex gap-2">
-                <Input 
-                  placeholder="Add a subtask..." 
+                <Input
+                  placeholder="Add a subtask..."
                   value={newSubtask}
-                  onChange={e => setNewSubtask(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addSubtask()}
+                  onChange={(e) => setNewSubtask(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
                 />
-                <Button size="sm" onClick={addSubtask}>Add</Button>
+                <Button size="sm" onClick={handleAddSubtask} disabled={addSubtask.isPending}>Add</Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Attachments */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Attachments</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Attachments</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 p-2 rounded-lg border">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm flex-1">wireframe-v2.fig</span>
-                  <Button variant="ghost" size="sm">View</Button>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-lg border">
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm flex-1">requirements.pdf</span>
-                  <Button variant="ghost" size="sm">View</Button>
-                </div>
-              </div>
-              <Button variant="outline" className="mt-4 w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Upload Attachment
-              </Button>
+              <p className="text-sm text-muted-foreground">Upload attachments coming soon.</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Panel */}
         <div className="flex flex-col gap-6">
-          {/* Status Actions */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Actions</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Actions</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-3">
-              {status !== 'Done' && (
-                <Button onClick={advanceStatus} className="w-full">
-                  Move to {nextStatus[status] || 'Next'}
-                </Button>
-              )}
-              {status === 'Done' && (
-                <p className="text-sm text-muted-foreground text-center">This task is completed.</p>
+              {nextStatuses.length > 0 ? (
+                nextStatuses.map((status) => (
+                  <Button key={status} onClick={() => handleStatusChange(status)} className="w-full" disabled={updateStatus.isPending}>
+                    Move to {TASK_STATUS_DISPLAY[status]}
+                  </Button>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground text-center">Task completed.</p>
               )}
               <Button variant="outline" className="w-full">
-                <Clock className="mr-2 h-4 w-4" />
-                Log Time
+                <Clock className="mr-2 h-4 w-4" />Log Time
               </Button>
             </CardContent>
           </Card>
 
-          {/* Comments */}
           <Card>
             <CardHeader className="flex flex-row items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              <CardTitle className="text-lg">Comments</CardTitle>
+              <MessageSquare className="h-5 w-5" /><CardTitle className="text-lg">Comments</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {comments.map(comment => (
+              {task.comments.length === 0 && (
+                <p className="text-sm text-muted-foreground">No comments yet.</p>
+              )}
+              {task.comments.map((comment) => (
                 <div key={comment.id} className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{comment.author}</span>
-                    <span className="text-xs text-muted-foreground">{comment.date}</span>
+                    <span className="text-sm font-medium">{comment.userName}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{comment.text}</p>
+                  <p className="text-sm text-muted-foreground">{comment.body}</p>
                 </div>
               ))}
               <div className="flex flex-col gap-2 mt-2">
-                <Textarea 
-                  placeholder="Add a comment..." 
+                <Textarea
+                  placeholder="Add a comment..."
                   value={newComment}
-                  onChange={e => setNewComment(e.target.value)}
+                  onChange={(e) => setNewComment(e.target.value)}
                   rows={3}
                 />
-                <Button size="sm" className="self-end">
+                <Button size="sm" className="self-end" onClick={handlePostComment} disabled={addComment.isPending}>
                   Post Comment
                 </Button>
               </div>
             </CardContent>
           </Card>
+
+          {task.activityLog.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Activity</CardTitle></CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                {task.activityLog.map((entry) => (
+                  <div key={entry.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{entry.userName}</span>
+                    <span>{entry.action.replace(/_/g, ' ')}</span>
+                    <span>·</span>
+                    <span>{new Date(entry.createdAt).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

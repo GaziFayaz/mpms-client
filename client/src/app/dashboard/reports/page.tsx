@@ -1,10 +1,22 @@
 'use client';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { useReportsOverview } from '@/hooks/use-reports';
+import { PROJECT_STATUS_DISPLAY } from '@/lib/constants';
 import { Folder, CheckSquare, Clock, TrendingUp } from 'lucide-react';
 
 export default function ReportsPage() {
+  const { data: projects, isLoading } = useReportsOverview();
+
+  const totalTasks = projects?.reduce((sum, p) => sum + p.total_tasks, 0) ?? 0;
+  const avgProgress = projects?.length
+    ? Math.round(projects.reduce((sum, p) => sum + p.progress_percent, 0) / projects.length)
+    : 0;
+
+  const statusCounts = { todo: 0, in_progress: 0, review: 0, done: 0 };
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -19,8 +31,8 @@ export default function ReportsPage() {
             <Folder className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">4 active</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : projects?.length ?? 0}</div>
+            <p className="text-xs text-muted-foreground">{projects?.filter(p => p.status === 'active').length ?? 0} active</p>
           </CardContent>
         </Card>
 
@@ -30,19 +42,7 @@ export default function ReportsPage() {
             <CheckSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-muted-foreground">62% completed</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hours Logged</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">432h</div>
-            <p className="text-xs text-muted-foreground">This month</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : totalTasks}</div>
           </CardContent>
         </Card>
 
@@ -52,57 +52,46 @@ export default function ReportsPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">58%</div>
-            <p className="text-xs text-muted-foreground">Across projects</p>
+            <div className="text-2xl font-bold">{isLoading ? '-' : `${avgProgress}%`}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isLoading ? '-' : projects?.filter(p => p.status === 'active').length ?? 0}</div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tasks by Status</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {[
-              { label: 'To Do', count: 45, color: 'bg-slate-400', pct: 29 },
-              { label: 'In Progress', count: 38, color: 'bg-blue-500', pct: 24 },
-              { label: 'Review', count: 22, color: 'bg-amber-500', pct: 14 },
-              { label: 'Done', count: 51, color: 'bg-green-500', pct: 33 },
-            ].map(item => (
-              <div key={item.label} className="flex items-center gap-3">
-                <span className="w-20 text-sm text-muted-foreground">{item.label}</span>
-                <div className="flex-1 h-5 bg-muted rounded-full overflow-hidden">
-                  <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${item.pct}%` }} />
-                </div>
-                <span className="w-8 text-sm text-right font-medium">{item.count}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Project Progress</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {[
-              { name: 'Website Redesign', progress: 60 },
-              { name: 'Mobile App MVP', progress: 25 },
-              { name: 'CRM Integration', progress: 40 },
-              { name: 'Marketing Campaign', progress: 95 },
-            ].map(project => (
-              <div key={project.name} className="flex flex-col gap-2">
+      <Card>
+        <CardHeader><CardTitle>Project Progress</CardTitle></CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
+          ) : (
+            projects?.map((p) => (
+              <div key={p.id} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span>{project.name}</span>
-                  <span className="text-muted-foreground">{project.progress}%</span>
+                  <div className="flex items-center gap-2">
+                    <span>{p.title}</span>
+                    <span className="text-xs text-muted-foreground">({p.client})</span>
+                  </div>
+                  <span className="text-muted-foreground">{p.progress_percent}%</span>
                 </div>
-                <Progress value={project.progress} />
+                <Progress value={p.progress_percent} />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{p.completed_tasks} / {p.total_tasks} tasks</span>
+                  <span>{PROJECT_STATUS_DISPLAY[p.status]}</span>
+                </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
