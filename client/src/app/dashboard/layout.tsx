@@ -1,25 +1,45 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/use-auth';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { Header } from '@/components/layout/header';
+import { LoadingSpinner } from '@/components/shared/loading-spinner';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist.onFinishHydration(() => {
+        setHydrated(true);
+      });
+      return unsub;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.replace('/login');
     } else if (user?.role !== 'admin' && user?.role !== 'manager') {
       router.replace('/user');
     }
-  }, [_hasHydrated, isAuthenticated, user, router]);
+  }, [hydrated, isAuthenticated, user, router]);
 
-  if (!_hasHydrated) return null;
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   if (!isAuthenticated || (user?.role !== 'admin' && user?.role !== 'manager')) {
     return null;
   }

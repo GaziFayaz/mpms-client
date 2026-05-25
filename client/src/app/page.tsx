@@ -1,15 +1,27 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/use-auth';
 
 export default function RootPage() {
   const router = useRouter();
-  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist.onFinishHydration(() => {
+        setHydrated(true);
+      });
+      return unsub;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -19,7 +31,7 @@ export default function RootPage() {
     } else {
       router.replace('/user');
     }
-  }, [_hasHydrated, isAuthenticated, user, router]);
+  }, [hydrated, isAuthenticated, user, router]);
 
   return null;
 }

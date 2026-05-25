@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/layout/header';
+import { LoadingSpinner } from '@/components/shared/loading-spinner';
 import { LayoutDashboard, Folder, CheckSquare } from 'lucide-react';
 
 const routes = [
@@ -55,11 +56,23 @@ export function UserSidebar() {
 }
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
+    if (useAuthStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      const unsub = useAuthStore.persist.onFinishHydration(() => {
+        setHydrated(true);
+      });
+      return unsub;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -67,9 +80,16 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     if (user?.role !== 'member' && user?.role !== 'manager') {
       router.replace('/dashboard');
     }
-  }, [_hasHydrated, isAuthenticated, user, router]);
+  }, [hydrated, isAuthenticated, user, router]);
 
-  if (!_hasHydrated) return null;
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   if (!isAuthenticated || (user?.role !== 'member' && user?.role !== 'manager')) {
     return null;
   }
