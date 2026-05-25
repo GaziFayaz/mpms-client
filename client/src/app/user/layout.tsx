@@ -55,10 +55,11 @@ export function UserSidebar() {
 }
 
 export default function UserLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
+    if (!_hasHydrated) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
@@ -66,8 +67,9 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
     if (user?.role !== 'member' && user?.role !== 'manager') {
       router.replace('/dashboard');
     }
-  }, [isAuthenticated, user, router]);
+  }, [_hasHydrated, isAuthenticated, user, router]);
 
+  if (!_hasHydrated) return null;
   if (!isAuthenticated || (user?.role !== 'member' && user?.role !== 'manager')) {
     return null;
   }

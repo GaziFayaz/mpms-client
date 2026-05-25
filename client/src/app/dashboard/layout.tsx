@@ -7,19 +7,21 @@ import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { Header } from '@/components/layout/header';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
+    if (!_hasHydrated) return;
     if (!isAuthenticated) {
       router.replace('/login');
     } else if (user?.role !== 'admin' && user?.role !== 'manager') {
       router.replace('/user');
     }
-  }, [isAuthenticated, user, router]);
+  }, [_hasHydrated, isAuthenticated, user, router]);
 
+  if (!_hasHydrated) return null;
   if (!isAuthenticated || (user?.role !== 'admin' && user?.role !== 'manager')) {
-    return null; // Avoid flashing UI before redirect
+    return null;
   }
 
   return (
