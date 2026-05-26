@@ -67,8 +67,8 @@ export default function UserProjectDetailPage() {
                 <p className="text-xs text-muted-foreground">{sprint.startDate} - {sprint.endDate}</p>
               </div>
               <div className="flex items-center gap-4">
-                <Progress value={sprint.stats.progress_percent} className="w-20" />
-                <span className="text-sm text-muted-foreground">{sprint.stats.completed_tasks}/{sprint.stats.total_tasks}</span>
+                <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
+                <span className="text-sm text-muted-foreground">{sprint.stats?.completed_tasks ?? 0}/{sprint.stats?.total_tasks ?? 0}</span>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </div>
             </Link>

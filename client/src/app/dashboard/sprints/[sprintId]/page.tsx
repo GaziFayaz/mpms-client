@@ -28,9 +28,9 @@ export default function SprintDetailPage() {
     return <div className="text-center py-12 text-muted-foreground">Sprint not found.</div>;
   }
 
-  const progress = sprint.stats.total_tasks > 0
-    ? Math.round((sprint.stats.completed_tasks / sprint.stats.total_tasks) * 100)
-    : 0;
+  const totalTasks = sprint.stats?.total_tasks ?? 0;
+  const completedTasks = sprint.stats?.completed_tasks ?? 0;
+  const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -46,11 +46,11 @@ export default function SprintDetailPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-3xl font-bold">{sprint.stats.total_tasks}</div>
+          <div className="text-3xl font-bold">{totalTasks}</div>
           <div className="text-sm text-muted-foreground">Total Tasks</div>
         </Card>
         <Card className="p-4 flex flex-col items-center justify-center text-center">
-          <div className="text-3xl font-bold">{sprint.stats.completed_tasks}</div>
+          <div className="text-3xl font-bold">{completedTasks}</div>
           <div className="text-sm text-muted-foreground">Completed</div>
         </Card>
         <Card className="md:col-span-2 p-4 flex flex-col justify-center">
@@ -66,7 +66,7 @@ export default function SprintDetailPage() {
         <CardHeader><CardTitle className="text-lg">Tasks</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-col gap-2">
-            {sprint.tasks.map((task) => (
+            {sprint.tasks?.map((task) => (
               <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50">
                 <div className={`shrink-0 size-5 rounded border-2 flex items-center justify-center ${
                   task.status === 'done' ? 'bg-primary border-primary' : 'border-muted-foreground/30'

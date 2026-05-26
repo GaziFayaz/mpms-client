@@ -137,7 +137,6 @@ export default function ProjectDetailPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{sprints?.length ?? 0} sprints</p>
-              <Link href={`/dashboard/sprints/${projectId}`} className="text-sm text-primary hover:underline">Manage Sprints</Link>
             </div>
             {!sprints?.length ? (
               <div className="text-center py-8 border rounded-lg border-dashed">
@@ -155,8 +154,8 @@ export default function ProjectDetailPage() {
                     <p className="text-xs text-muted-foreground">{sprint.startDate} - {sprint.endDate}</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <Progress value={sprint.stats.progress_percent} className="w-20" />
-                    <span className="text-sm text-muted-foreground">{sprint.stats.completed_tasks}/{sprint.stats.total_tasks}</span>
+                    <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
+                    <span className="text-sm text-muted-foreground">{sprint.stats?.completed_tasks ?? 0}/{sprint.stats?.total_tasks ?? 0}</span>
                   </div>
                 </Link>
               ))
