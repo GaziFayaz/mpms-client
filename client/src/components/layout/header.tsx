@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -59,12 +60,16 @@ export function Header() {
           <span className="sr-only">Toggle user menu</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>
-            {user?.name || 'My Account'}
-            <div className="text-xs text-muted-foreground font-normal">{user?.email}</div>
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>
+              {user?.name || 'My Account'}
+              <div className="text-xs text-muted-foreground font-normal">{user?.email}</div>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
