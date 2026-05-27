@@ -12,6 +12,7 @@ import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
 import { useTask, useToggleSubtask, useAddComment, useUpdateTaskStatus } from '@/hooks/use-tasks';
 import { TASK_STATUS_TRANSITIONS, TASK_STATUS_DISPLAY } from '@/lib/constants';
 import { ArrowLeft, Check, Clock } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 export default function UserTaskDetailPage() {
   const params = useParams<{ taskId: string }>();
@@ -86,7 +87,7 @@ export default function UserTaskDetailPage() {
                 <div key={c.id} className="flex flex-col gap-1 text-sm">
                   <span className="font-medium">{c.userName}</span>
                   <span className="text-muted-foreground">{c.body}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-muted-foreground">{formatDate(c.createdAt)}</span>
                 </div>
               ))}
               <Textarea placeholder="Add a comment..." value={comment} onChange={(e) => setComment(e.target.value)} rows={3} />

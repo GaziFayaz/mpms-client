@@ -11,9 +11,10 @@ import { CheckSquare, Clock, Folder, Activity } from 'lucide-react';
 
 export default function UserDashboard() {
   const { user } = useAuthStore();
-  const { data: tasks, isLoading } = useTasks();
+  const { data: tasksResponse, isLoading } = useTasks({ limit: 100 });
+  const tasksData = tasksResponse?.data ?? [];
 
-  const myTasks = tasks?.filter((t) => t.assignees.some((a) => a.id === user?.id)) ?? [];
+  const myTasks = tasksData.filter((t) => t.assignees.some((a) => a.id === user?.id));
   const completedCount = myTasks.filter((t) => t.status === 'done').length;
 
   return (

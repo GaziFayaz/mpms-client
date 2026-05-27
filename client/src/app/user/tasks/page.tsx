@@ -12,7 +12,8 @@ import { TASK_STATUS_DISPLAY } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 
 export default function UserTasksPage() {
-  const { data: tasks, isLoading } = useTasks();
+  const { data: tasksResponse, isLoading } = useTasks({ limit: 100 });
+  const tasks = tasksResponse?.data ?? [];
   const { user } = useAuthStore();
 
   const myTasks = tasks?.filter((t) => t.assignees.some((a) => a.id === user?.id)) ?? [];

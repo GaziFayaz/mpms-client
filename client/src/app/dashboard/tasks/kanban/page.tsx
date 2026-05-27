@@ -84,7 +84,8 @@ function KanbanColumn({ status, tasks }: { status: TaskStatus; tasks: TaskListIt
 }
 
 export default function KanbanPage() {
-  const { data: allTasks, isLoading } = useTasks();
+  const { data: tasksResponse, isLoading } = useTasks();
+  const allTasks = tasksResponse?.data ?? [];
   const updateKanbanOrder = useUpdateKanbanOrder();
   const [activeTask, setActiveTask] = useState<TaskListItem | null>(null);
 
