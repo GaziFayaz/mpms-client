@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,18 +11,26 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TaskStatusBadge } from '@/components/tasks/task-status-badge';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
-import { useTask, useAddSubtask, useToggleSubtask, useAddComment, useUpdateTaskStatus } from '@/hooks/use-tasks';
+import { useTask, useAddSubtask, useToggleSubtask, useAddComment, useUpdateTaskStatus, useDeleteTask, useUploadAttachment, useDeleteAttachment } from '@/hooks/use-tasks';
 import { TASK_STATUS_TRANSITIONS, TASK_STATUS_DISPLAY } from '@/lib/constants';
-import { ArrowLeft, Plus, Check, X, Clock, MessageSquare, Paperclip, Edit } from 'lucide-react';
+import { ArrowLeft, Check, X, Clock, MessageSquare, Edit, Trash, Upload, FileText } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import Image from 'next/image';
+import type { Attachment } from '@/types';
 
 export default function TaskDetailPage() {
   const params = useParams<{ taskId: string }>();
+  const router = useRouter();
   const taskId = params.taskId;
   const { data: task, isLoading } = useTask(taskId);
   const addSubtask = useAddSubtask();
   const toggleSubtask = useToggleSubtask();
   const addComment = useAddComment();
   const updateStatus = useUpdateTaskStatus();
+  const deleteTask = useDeleteTask();
+  const uploadAttachment = useUploadAttachment();
+  const deleteAttachment = useDeleteAttachment();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newSubtask, setNewSubtask] = useState('');
   const [newComment, setNewComment] = useState('');
@@ -65,6 +73,21 @@ export default function TaskDetailPage() {
     updateStatus.mutate({ id: task.id, status });
   };
 
+  const handleDeleteTask = async () => {
+    if (!confirm('Delete this task? This cannot be undone.')) return;
+    await deleteTask.mutateAsync(task.id);
+    router.push('/dashboard/tasks');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadAttachment.mutate({ taskId: task.id, file });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const isImage = (type: string) => type.startsWith('image/');
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -77,6 +100,9 @@ export default function TaskDetailPage() {
         </div>
         <Button render={<Link href={`/dashboard/tasks/${task.id}/edit`} />} nativeButton={false} variant="outline">
           <Edit className="mr-2 h-4 w-4" />Edit
+        </Button>
+        <Button variant="destructive" onClick={handleDeleteTask} disabled={deleteTask.isPending}>
+          <Trash className="mr-2 h-4 w-4" />Delete
         </Button>
       </div>
 
@@ -92,6 +118,11 @@ export default function TaskDetailPage() {
                 {task.estimateHours && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" /><span>Est: {task.estimateHours}h</span>
+                  </div>
+                )}
+                {task.dueDate && (
+                  <div className="text-sm text-muted-foreground">
+                    Due: {formatDate(task.dueDate)}
                   </div>
                 )}
               </div>
@@ -139,9 +170,52 @@ export default function TaskDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-lg">Attachments</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Attachments</CardTitle>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,application/pdf"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadAttachment.isPending}>
+                <Upload className="mr-2 h-4 w-4" />
+                {uploadAttachment.isPending ? 'Uploading...' : 'Upload'}
+              </Button>
+            </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Upload attachments coming soon.</p>
+              <div className="flex flex-col gap-2">
+                {task.attachments && task.attachments.length > 0 ? (
+                  task.attachments.map((att: Attachment) => (
+                    <div key={att.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50">
+                      <div className="shrink-0">
+                    {isImage(att.fileType) ? (
+                      <Image src={att.fileUrl} alt={att.fileName} width={40} height={40} className="size-10 object-cover rounded" />
+                    ) : (
+                          <FileText className="size-10 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <a href={att.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:underline block truncate">
+                          {att.fileName}
+                        </a>
+                        <span className="text-xs text-muted-foreground">{(att.fileSize / 1024).toFixed(0)} KB · {formatDate(att.createdAt)}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => deleteAttachment.mutate({ attachmentId: att.id, taskId: task.id })}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">No attachments yet.</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -177,7 +251,7 @@ export default function TaskDetailPage() {
                 <div key={comment.id} className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium">{comment.userName}</span>
-                    <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleDateString()}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{comment.body}</p>
                 </div>
@@ -205,7 +279,7 @@ export default function TaskDetailPage() {
                     <span className="font-medium text-foreground">{entry.userName}</span>
                     <span>{entry.action.replace(/_/g, ' ')}</span>
                     <span>·</span>
-                    <span>{new Date(entry.createdAt).toLocaleDateString()}</span>
+                    <span>{formatDate(entry.createdAt)}</span>
                   </div>
                 ))}
               </CardContent>
