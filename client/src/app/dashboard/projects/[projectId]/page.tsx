@@ -1,20 +1,90 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useProject, useDeleteProject } from '@/hooks/use-projects';
 import { useTasks } from '@/hooks/use-tasks';
-import { useSprints } from '@/hooks/use-sprints';
+import { useSprints, useCreateSprint, useUpdateSprint, useDeleteSprint, useReorderSprint } from '@/hooks/use-sprints';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { TaskStatusBadge } from '@/components/tasks/task-status-badge';
 import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
-import { ArrowLeft, Edit, Trash, Plus } from 'lucide-react';
+import SprintForm from '@/components/sprints/sprint-form';
+import { ArrowLeft, Edit, Trash, Plus, GripVertical } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import type { SprintListItem } from '@/types';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+function SortableSprintCard({
+  sprint,
+  onEdit,
+  onDelete,
+}: {
+  sprint: SprintListItem;
+  onEdit: (sprint: SprintListItem) => void;
+  onDelete: (sprint: SprintListItem) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: sprint.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 group"
+    >
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground" tabIndex={-1}>
+          <GripVertical className="h-5 w-5" />
+        </button>
+        <Link href={`/dashboard/sprints/${sprint.id}`} className="flex-1 min-w-0">
+          <p className="font-medium truncate">Sprint {sprint.sprintNumber}: {sprint.title}</p>
+          <p className="text-xs text-muted-foreground">{formatDate(sprint.startDate)} - {formatDate(sprint.endDate)}</p>
+        </Link>
+      </div>
+      <div className="flex items-center gap-4">
+        <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
+        <span className="text-sm text-muted-foreground whitespace-nowrap">{sprint.stats?.completed_tasks ?? 0}/{sprint.stats?.total_tasks ?? 0}</span>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(sprint)}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(sprint)}>
+            <Trash className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
@@ -22,11 +92,88 @@ export default function ProjectDetailPage() {
   const projectId = params.projectId;
 
   const { data: project, isLoading: projectLoading } = useProject(projectId);
-  const { data: sprints } = useSprints(projectId);
-  const { data: tasks, isLoading: tasksLoading } = useTasks({ project: projectId });
+  const { data: sprints, isLoading: sprintsLoading } = useSprints(projectId);
+  const { data: tasksResponse, isLoading: tasksLoading } = useTasks({ project: projectId, limit: 100 });
+  const createSprint = useCreateSprint();
+  const updateSprint = useUpdateSprint();
+  const deleteSprint = useDeleteSprint();
+  const reorderSprint = useReorderSprint();
   const deleteProject = useDeleteProject();
 
-  const handleDelete = async () => {
+  const [sprintModalOpen, setSprintModalOpen] = useState(false);
+  const [editingSprint, setEditingSprint] = useState<SprintListItem | null>(null);
+  const [activeSprint, setActiveSprint] = useState<SprintListItem | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const sortedSprints = useMemo(() => {
+    if (!sprints) return [];
+    return [...sprints].sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [sprints]);
+
+  const handleCreateSprint = () => {
+    setEditingSprint(null);
+    setSprintModalOpen(true);
+  };
+
+  const handleEditSprint = (sprint: SprintListItem) => {
+    setEditingSprint(sprint);
+    setSprintModalOpen(true);
+  };
+
+  const handleDeleteSprint = async (sprint: SprintListItem) => {
+    if (!confirm(`Delete Sprint ${sprint.sprintNumber}: "${sprint.title}"?`)) return;
+    await deleteSprint.mutateAsync({ id: sprint.id, projectId });
+  };
+
+  const handleSprintSubmit = async (data: { title: string; startDate: string; endDate: string }) => {
+    if (editingSprint) {
+      await updateSprint.mutateAsync({
+        id: editingSprint.id,
+        projectId,
+        title: data.title,
+        startDate: new Date(data.startDate).toISOString(),
+        endDate: new Date(data.endDate).toISOString(),
+      });
+    } else {
+      await createSprint.mutateAsync({
+        projectId,
+        title: data.title,
+        startDate: new Date(data.startDate).toISOString(),
+        endDate: new Date(data.endDate).toISOString(),
+      });
+    }
+    setSprintModalOpen(false);
+    setEditingSprint(null);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const sprint = sprints?.find((s) => s.id === event.active.id);
+    if (sprint) setActiveSprint(sprint);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveSprint(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sortedSprints.findIndex((s) => s.id === active.id);
+    const newIndex = sortedSprints.findIndex((s) => s.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = [...sortedSprints];
+    const [removed] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, removed);
+
+    reordered.forEach((s, i) => {
+      const sprint = sprints?.find((sp) => sp.id === s.id);
+      if (sprint && sprint.sortOrder !== i) {
+        reorderSprint.mutate({ id: s.id, sortOrder: i, projectId });
+      }
+    });
+  };
+
+  const handleDeleteProjectAction = async () => {
     if (!confirm('Delete this project?')) return;
     await deleteProject.mutateAsync(projectId);
     router.push('/dashboard/projects');
@@ -50,7 +197,7 @@ export default function ProjectDetailPage() {
     return <div className="text-center py-12 text-muted-foreground">Project not found.</div>;
   }
 
-  const projectTasks = tasks?.filter((t) => t.projectId === projectId) ?? [];
+  const projectTasks = tasksResponse?.data?.filter((t) => t.projectId === projectId) ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,7 +213,7 @@ export default function ProjectDetailPage() {
         <Button render={<Link href={`/dashboard/projects/${projectId}/edit`} />} nativeButton={false} variant="outline">
           <Edit className="mr-2 h-4 w-4" />Edit
         </Button>
-        <Button variant="destructive" onClick={handleDelete} disabled={deleteProject.isPending}>
+        <Button variant="destructive" onClick={handleDeleteProjectAction} disabled={deleteProject.isPending}>
           <Trash className="mr-2 h-4 w-4" />Delete
         </Button>
       </div>
@@ -112,11 +259,11 @@ export default function ProjectDetailPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Start Date</p>
-                  <p className="font-medium">{project.startDate}</p>
+                  <p className="font-medium">{formatDate(project.startDate)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">End Date</p>
-                  <p className="font-medium">{project.endDate}</p>
+                  <p className="font-medium">{formatDate(project.endDate)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Budget</p>
@@ -137,28 +284,42 @@ export default function ProjectDetailPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{sprints?.length ?? 0} sprints</p>
+              <Button onClick={handleCreateSprint} size="sm">
+                <Plus className="mr-2 h-4 w-4" />Create Sprint
+              </Button>
             </div>
-            {!sprints?.length ? (
+            {sprintsLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : !sortedSprints.length ? (
               <div className="text-center py-8 border rounded-lg border-dashed">
                 <p className="text-muted-foreground">No sprints yet.</p>
               </div>
             ) : (
-              sprints.map((sprint) => (
-                <Link
-                  key={sprint.id}
-                  href={`/dashboard/sprints/${sprint.id}`}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
-                >
-                  <div>
-                    <p className="font-medium">Sprint {sprint.sprintNumber}: {sprint.title}</p>
-                    <p className="text-xs text-muted-foreground">{sprint.startDate} - {sprint.endDate}</p>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+                <SortableContext items={sortedSprints.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                  <div className="flex flex-col gap-2">
+                    {sortedSprints.map((sprint) => (
+                      <SortableSprintCard
+                        key={sprint.id}
+                        sprint={sprint}
+                        onEdit={handleEditSprint}
+                        onDelete={handleDeleteSprint}
+                      />
+                    ))}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
-                    <span className="text-sm text-muted-foreground">{sprint.stats?.completed_tasks ?? 0}/{sprint.stats?.total_tasks ?? 0}</span>
-                  </div>
-                </Link>
-              ))
+                </SortableContext>
+                <DragOverlay>
+                  {activeSprint && (
+                    <div className="flex items-center gap-3 p-4 border rounded-lg bg-background shadow-lg">
+                      <GripVertical className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-medium">Sprint {activeSprint.sprintNumber}: {activeSprint.title}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(activeSprint.startDate)} - {formatDate(activeSprint.endDate)}</p>
+                      </div>
+                    </div>
+                  )}
+                </DragOverlay>
+              </DndContext>
             )}
           </div>
         </TabsContent>
@@ -224,6 +385,17 @@ export default function ProjectDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <SprintForm
+        open={sprintModalOpen}
+        onClose={() => {
+          setSprintModalOpen(false);
+          setEditingSprint(null);
+        }}
+        onSubmit={handleSprintSubmit}
+        sprint={editingSprint}
+        isPending={createSprint.isPending || updateSprint.isPending}
+      />
     </div>
   );
 }

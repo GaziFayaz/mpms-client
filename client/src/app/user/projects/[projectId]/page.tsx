@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useProject } from '@/hooks/use-projects';
 import { ProjectStatusBadge } from '@/components/projects/project-status-badge';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
 
 export default function UserProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
@@ -30,7 +31,7 @@ export default function UserProjectDetailPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{project.title}</h1>
-          <p className="text-muted-foreground">{project.client} · {project.startDate} to {project.endDate}</p>
+          <p className="text-muted-foreground">{project.client} · {formatDate(project.startDate)} to {formatDate(project.endDate)}</p>
         </div>
         <ProjectStatusBadge status={project.status} />
       </div>
@@ -64,7 +65,7 @@ export default function UserProjectDetailPage() {
             >
               <div>
                 <p className="font-medium">Sprint {sprint.sprintNumber}: {sprint.title}</p>
-                <p className="text-xs text-muted-foreground">{sprint.startDate} - {sprint.endDate}</p>
+                <p className="text-xs text-muted-foreground">{formatDate(sprint.startDate)} - {formatDate(sprint.endDate)}</p>
               </div>
               <div className="flex items-center gap-4">
                 <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
