@@ -64,9 +64,45 @@ export function useUpdateSprint() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['sprints'] });
       qc.invalidateQueries({ queryKey: ['projects', vars.projectId] });
+      toast.success('Sprint updated');
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Failed to update sprint');
+    },
+  });
+}
+
+export function useDeleteSprint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
+      await api.delete(`/sprints/${id}`);
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      qc.invalidateQueries({ queryKey: ['sprints'] });
+      qc.invalidateQueries({ queryKey: ['projects', projectId] });
+      toast.success('Sprint deleted');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to delete sprint');
+    },
+  });
+}
+
+export function useReorderSprint() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, sortOrder, projectId }: { id: string; sortOrder: number; projectId: string }) => {
+      await api.patch(`/sprints/${id}/order`, { sortOrder });
+      return projectId;
+    },
+    onSuccess: (projectId) => {
+      qc.invalidateQueries({ queryKey: ['sprints'] });
+      qc.invalidateQueries({ queryKey: ['projects', projectId] });
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to reorder sprint');
     },
   });
 }

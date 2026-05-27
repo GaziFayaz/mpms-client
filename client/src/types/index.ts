@@ -147,12 +147,24 @@ export interface TaskDetail extends TaskListItem {
   subtasks: Subtask[];
   comments: CommentItem[];
   activityLog: ActivityItem[];
+  attachments?: Attachment[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SprintDetail extends SprintListItem {
   tasks: TaskListItem[];
+}
+
+export interface Attachment {
+  id: string;
+  taskId: string;
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+  fileSize: number;
+  uploadedBy: string;
+  createdAt: string;
 }
 
 export interface TimeLog {

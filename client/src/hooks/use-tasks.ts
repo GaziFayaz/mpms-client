@@ -1,13 +1,42 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
-import type { TaskListItem, TaskDetail, Subtask, TaskStatus } from '@/types';
+import type { TaskListItem, TaskDetail, Subtask, TaskStatus, ApiListResponse } from '@/types';
 
-export function useTasks(params?: Record<string, string>) {
+interface TaskListParams {
+  project?: string;
+  sprint?: string;
+  assignee?: string;
+  status?: string;
+  priority?: string;
+  page?: number;
+  limit?: number;
+}
+
+interface CreateTaskData {
+  sprintId: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  estimateHours?: number;
+  dueDate?: string;
+  assigneeIds?: string[];
+}
+
+export function useTasks(params?: TaskListParams) {
   return useQuery({
     queryKey: ['tasks', params],
     queryFn: async () => {
-      const res = await api.get<TaskListItem[]>('/tasks', { params });
+      const searchParams: Record<string, string> = {};
+      if (params?.project) searchParams.project = params.project;
+      if (params?.sprint) searchParams.sprint = params.sprint;
+      if (params?.assignee) searchParams.assignee = params.assignee;
+      if (params?.status) searchParams.status = params.status;
+      if (params?.priority) searchParams.priority = params.priority;
+      if (params?.page) searchParams.page = String(params.page);
+      if (params?.limit) searchParams.limit = String(params.limit);
+
+      const res = await api.get<ApiListResponse<TaskListItem>>('/tasks', { params: searchParams });
       return res.data;
     },
   });
@@ -27,12 +56,13 @@ export function useTask(id: string | undefined) {
 export function useCreateTask() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
+    mutationFn: async (data: CreateTaskData) => {
       const res = await api.post('/tasks', data);
       return res.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['sprints'] });
       toast.success('Task created');
     },
     onError: (err: any) => {
@@ -51,10 +81,28 @@ export function useUpdateTask() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['tasks'] });
       qc.invalidateQueries({ queryKey: ['tasks', vars.id] });
+      qc.invalidateQueries({ queryKey: ['sprints'] });
       toast.success('Task updated');
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Failed to update task');
+    },
+  });
+}
+
+export function useDeleteTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/tasks/${id}`);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['sprints'] });
+      toast.success('Task deleted');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to delete task');
     },
   });
 }
@@ -178,6 +226,44 @@ export function useAddTimeLog() {
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.error || 'Failed to log time');
+    },
+  });
+}
+
+export function useUploadAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, file }: { taskId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post(`/tasks/${taskId}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return res.data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['tasks', vars.taskId] });
+      toast.success('Attachment uploaded');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to upload attachment');
+    },
+  });
+}
+
+export function useDeleteAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ attachmentId, taskId }: { attachmentId: string; taskId: string }) => {
+      await api.delete(`/attachments/${attachmentId}`);
+      return taskId;
+    },
+    onSuccess: (taskId) => {
+      qc.invalidateQueries({ queryKey: ['tasks', taskId] });
+      toast.success('Attachment deleted');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to delete attachment');
     },
   });
 }
