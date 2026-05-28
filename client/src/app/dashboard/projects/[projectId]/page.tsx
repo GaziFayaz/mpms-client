@@ -18,7 +18,7 @@ import { TaskPriorityBadge } from '@/components/tasks/task-priority-badge';
 import SprintForm from '@/components/sprints/sprint-form';
 import { ArrowLeft, Edit, Trash, Plus, GripVertical } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import type { SprintListItem } from '@/types';
+import type { SprintListItem, TaskListItem, ProjectStats } from '@/types';
 import {
   DndContext,
   DragEndEvent,
@@ -38,10 +38,12 @@ import { CSS } from '@dnd-kit/utilities';
 
 function SortableSprintCard({
   sprint,
+  stats,
   onEdit,
   onDelete,
 }: {
   sprint: SprintListItem;
+  stats: ProjectStats;
   onEdit: (sprint: SprintListItem) => void;
   onDelete: (sprint: SprintListItem) => void;
 }) {
@@ -71,8 +73,8 @@ function SortableSprintCard({
         </Link>
       </div>
       <div className="flex items-center gap-4">
-        <Progress value={sprint.stats?.progress_percent ?? 0} className="w-20" />
-        <span className="text-sm text-muted-foreground whitespace-nowrap">{sprint.stats?.completed_tasks ?? 0}/{sprint.stats?.total_tasks ?? 0}</span>
+        <Progress value={stats.progress_percent} className="w-20" />
+        <span className="text-sm text-muted-foreground whitespace-nowrap">{stats.completed_tasks}/{stats.total_tasks}</span>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(sprint)}>
             <Edit className="h-4 w-4" />
@@ -110,6 +112,22 @@ export default function ProjectDetailPage() {
     if (!sprints) return [];
     return [...sprints].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [sprints]);
+
+  const sprintStatsMap = useMemo(() => {
+    const tasks = tasksResponse?.data ?? [];
+    const map = new Map<string, ProjectStats>();
+    for (const sprint of sortedSprints) {
+      const sprintTasks = tasks.filter((t: TaskListItem) => t.sprintId === sprint.id);
+      const total = sprintTasks.length;
+      const completed = sprintTasks.filter((t: TaskListItem) => t.status === 'done').length;
+      map.set(sprint.id, {
+        total_tasks: total,
+        completed_tasks: completed,
+        progress_percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      });
+    }
+    return map;
+  }, [sortedSprints, tasksResponse?.data]);
 
   const handleCreateSprint = () => {
     setEditingSprint(null);
@@ -302,6 +320,7 @@ export default function ProjectDetailPage() {
                       <SortableSprintCard
                         key={sprint.id}
                         sprint={sprint}
+                        stats={sprintStatsMap.get(sprint.id) ?? { total_tasks: 0, completed_tasks: 0, progress_percent: 0 }}
                         onEdit={handleEditSprint}
                         onDelete={handleDeleteSprint}
                       />
