@@ -14,7 +14,7 @@ import { useTeam } from '@/hooks/use-team';
 import { useSprints } from '@/hooks/use-sprints';
 import { useProjects } from '@/hooks/use-projects';
 import { X, Check } from 'lucide-react';
-import type { TaskDetail, UserListItem, SprintListItem } from '@/types';
+import type { TaskDetail, UserListItem, SprintListItem, ProjectListItem } from '@/types';
 
 const taskSchema = z.object({
   sprintId: z.string().min(1, 'Sprint is required'),
@@ -64,7 +64,7 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
   const isEdit = !!task;
   const { data: teamMembers } = useTeam();
   const { data: projects } = useProjects();
-  const [sprintProjectId, setSprintProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
 
   const {
@@ -83,7 +83,12 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
   const priorityValue = watch('priority');
   const statusValue = watch('status');
 
-  const { data: sprints } = useSprints(sprintProjectId || '');
+  const { data: sprints } = useSprints(selectedProjectId || '');
+
+  const projectsList = useMemo(() => {
+    if (!projects) return [];
+    return Array.isArray(projects) ? projects : [];
+  }, [projects]);
 
   useEffect(() => {
     if (task) {
@@ -97,7 +102,7 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
         dueDate,
         status: task.status,
       });
-      setSprintProjectId(task.projectId);
+      setSelectedProjectId(task.projectId);
       setSelectedAssignees(task.assignees.map((a) => a.id));
     } else {
       reset({
@@ -110,6 +115,7 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
         status: 'todo',
       });
       setSelectedAssignees([]);
+      setSelectedProjectId(null);
     }
   }, [task, reset, defaultSprintId, open]);
 
@@ -125,10 +131,11 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
 
   const handleSprintChange = (val: string) => {
     setValue('sprintId', val);
-    const selectedSprint = sprintsList?.find((s: SprintListItem) => s.id === val);
-    if (selectedSprint) {
-      setSprintProjectId(selectedSprint.projectId);
-    }
+  };
+
+  const handleProjectChange = (val: string) => {
+    setSelectedProjectId(val);
+    setValue('sprintId', '');
   };
 
   const toggleAssignee = (userId: string) => {
@@ -144,13 +151,27 @@ export default function TaskForm({ open, onClose, onSubmit, task, isPending, def
   const formContent = (
     <form onSubmit={handleSubmit(handleFormSubmit)}>
       <FieldGroup className="flex flex-col gap-4">
-        <Field data-invalid={!!errors.sprintId}>
-          <FieldLabel>Sprint</FieldLabel>
-          <Select value={sprintId} onValueChange={safeSet(handleSprintChange)}>
-            <SelectTrigger><span>{sprintId ? (sprintsList?.find((s: SprintListItem) => s.id === sprintId) ? `Sprint ${(sprintsList.find((s: SprintListItem) => s.id === sprintId) as SprintListItem).sprintNumber}` : 'Select sprint') : 'Select a sprint'}</span></SelectTrigger>
+        <Field>
+          <FieldLabel>Project</FieldLabel>
+          <Select value={selectedProjectId || ''} onValueChange={safeSet(handleProjectChange)}>
+            <SelectTrigger><span>{selectedProjectId ? (projectsList.find((p: ProjectListItem) => p.id === selectedProjectId)?.title || 'Select project') : 'Select a project'}</span></SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {sprintsList?.map((s: SprintListItem) => (
+                {projectsList.map((p: ProjectListItem) => (
+                  <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </Field>
+
+        <Field data-invalid={!!errors.sprintId}>
+          <FieldLabel>Sprint</FieldLabel>
+          <Select value={sprintId} onValueChange={safeSet(handleSprintChange)} disabled={!selectedProjectId}>
+            <SelectTrigger><span>{sprintId ? (sprintsList.find((s: SprintListItem) => s.id === sprintId) ? `Sprint ${(sprintsList.find((s: SprintListItem) => s.id === sprintId) as SprintListItem).sprintNumber}` : 'Select sprint') : 'Select a sprint'}</span></SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {sprintsList.map((s: SprintListItem) => (
                   <SelectItem key={s.id} value={s.id}>Sprint {s.sprintNumber}: {s.title}</SelectItem>
                 ))}
               </SelectGroup>
