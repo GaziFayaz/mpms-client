@@ -36,8 +36,13 @@ function processQueue(error: unknown, token: string | null) {
 
 api.interceptors.response.use(
   (response) => {
-    // Unwrap { data } envelope if present
-    if (response.data && typeof response.data === 'object' && 'data' in response.data && !Array.isArray(response.data)) {
+    if (
+      response.data &&
+      typeof response.data === 'object' &&
+      'data' in response.data &&
+      !Array.isArray(response.data) &&
+      !('total' in response.data)
+    ) {
       return { ...response, data: response.data.data };
     }
     return response;
