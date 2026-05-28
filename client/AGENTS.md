@@ -25,3 +25,40 @@ Commit frequently and intentionally throughout development. Small, focused commi
 - Never commit secrets, environment files, or generated artifacts.
 - Review `git diff --staged` before committing to ensure you're committing exactly what you intend.
 
+# API Integration Rules — Backend OpenAPI Spec
+
+The backend exposes a live OpenAPI 3.1 spec at:
+
+```
+GET {BACKEND_URL}/api/openapi.json
+```
+
+The `BACKEND_URL` is configured via the `NEXT_PUBLIC_API_URL` environment variable (see `.env.example`).
+
+This spec is the **single source of truth** for all API calls. Never guess or assume endpoint shapes.
+
+## Workflow
+
+1. **Fetch the spec first** — before writing any API code, run:
+   ```bash
+   curl $NEXT_PUBLIC_API_URL/openapi.json | jq . > /tmp/openapi.json
+   ```
+   or fetch it programmatically. Read it to understand available endpoints.
+
+2. **Generate from spec** — derive all TypeScript types, API client functions, and validation schemas from the OpenAPI spec:
+   - Use `components.schemas` for data types (request bodies, response shapes).
+   - Use `paths` for exact HTTP methods, URLs, query params, and request bodies.
+
+3. **Respect auth** — the spec's `security` array on each operation tells you whether it requires `Authorization: Bearer <token>`. Never send tokens to unauthenticated endpoints or omit them from secured ones.
+
+4. **Respect role requirements** — each endpoint's `description` field mentions required roles (e.g., "Requires admin or manager"). Gate UI elements and API calls accordingly.
+
+5. **Handle errors from spec** — use the `ErrorResponse` schema from the spec to type error handlers. The backend returns:
+   ```json
+   { "error": "...", "status": 400, "details": "...", "stack": "..." }
+   ```
+
+6. **Re-fetch on changes** — whenever you are told the backend has changed, or if an API call returns unexpected errors, re-fetch `/api/openapi.json` before debugging. Do not fix frontend code against a stale spec.
+
+7. **Keep generated code in sync** — if you generate an API client file (e.g., `api-client.ts`), always regenerate it from the latest spec rather than patching it manually. Never hand-edit generated types to match what you think the backend does.
+
