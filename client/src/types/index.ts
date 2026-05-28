@@ -84,7 +84,7 @@ export interface SprintListItem {
   startDate: string;
   endDate: string;
   sortOrder: number;
-  stats: ProjectStats;
+  stats?: ProjectStats;
 }
 
 export interface ProjectDetail extends ProjectListItem {
