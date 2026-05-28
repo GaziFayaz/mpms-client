@@ -4,6 +4,8 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+> **CRITICAL: Before any git operation (commit, push, merge, rebase, etc.), RE-READ this AGENTS.md file and follow the Git Guidelines section below. Before any API integration work, RE-READ the API Integration Rules section. Do not proceed without verifying you have reviewed the applicable rules.**
+
 # Git Guidelines
 
 Commit frequently and intentionally throughout development. Small, focused commits are easier to review, revert, and understand than large monolithic ones.
